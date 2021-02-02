@@ -1,0 +1,64 @@
+name: Auto Api Secret
+
+on: 
+  schedule:
+    - cron: '53 */23 * * *'
+  watch:
+    types: [started]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: github.event.repository.owner.id == github.event.sender.id
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+            ref: master
+      
+      - name: Setup python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      
+      - name: Install requests
+        run: |
+          pip install requests
+      
+      - name: Read config from secrets
+        env: 
+          CONFIG_ID: ${{ secrets.CONFIG_ID }}
+          CONFIG_KEY: ${{ secrets.CONFIG_KEY }}
+        run: | 
+          cp 1.py 2.py
+          echo $CONFIG_ID > configid.txt
+          echo $CONFIG_KEY > configkey.txt
+          sed -i '10 r configid.txt' 2.py
+          sed -i '12 r configkey.txt' 2.py
+      
+      - name: Test Api
+        run: | 
+          echo `date +"%Y-%m-%d %H:%M:%S"` begin > time.log
+          python 2.py
+      
+      - name: Delete secrets config
+        run: | 
+          rm -f 2.py
+          rm -f configid.txt
+          rm -f configkey.txt    
+      
+      - name: Commit
+        run: |
+          git config --global user.email AutoupdateRobot@email.com
+          git config --global user.name AutoupdateRobot
+          git config pull.rebase true
+          rm -f .git/index
+          git reset
+          git stash
+          git pull
+          git checkout --orphan latest_branch
+          git add -A
+          git commit -m "update new refresh_token"
+          git branch -D master
+          git branch -m master
+          git push -f -u origin master
